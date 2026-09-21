@@ -1,16 +1,22 @@
-# Carbuncle Game Platform Architecture
+# Carbuncle RPG Architecture
 
 ## Executive Summary
 
-**Carbuncle** is a unified multiplayer gaming platform featuring multiple game modules (Slots, Fishing, Poker) accessible within a single persistent game client session. Built on **Galacean Engine** for rendering, **React** for Web, and **Expo React Native** for Mobile, the platform emphasizes backend-driven business logic, shared type safety, and seamless transitions between game modules without reloading.
+**Carbuncle RPG** is a standalone role-playing game featuring an explorable world, turn-based combat, dialogue systems, and integrated minigames (Slots, Fishing, Poker) accessible within the RPG environment. Built on **Galacean Engine** for rendering, **React** for Web, and **Expo React Native** for Mobile, the platform emphasizes backend-driven business logic, shared type safety, and seamless transitions between exploration, combat, and minigame modes without reloading.
+
+The architecture adapts proven patterns from the Aegis Engine (Entity-Component-System design, Manager abstraction, Event Bus) used in Persona 3 Dual, reimagined for the Galacean Engine ecosystem and the Carbuncle universe. All content uses original IP with no references to existing franchises.
 
 ### Core Design Principles
 
-1. **Single Client Session**: Users load the game client once; all game modules (Slots, Fishing, Poker) are accessible within the same runtime context.
-2. **Backend-Authoritative Logic**: All game state, rules, and business logic reside in the NestJS backend; clients are thin rendering layers.
-3. **Type Safety First**: Shared TypeScript types, enums, and DTOs ensure consistency across frontend, backend, and game modules.
-4. **Unified Engine**: Galacean Engine powers all visual rendering (2D/3D) across all game modules and future RPG features.
-5. **Multi-Platform Runtime**: Web (React + Vite) and Mobile (Expo React Native) share core logic via Nx monorepo libraries.
+1. **RPG-First Experience**: The primary experience is a full-featured RPG with exploration, combat, and narrative; minigames are integrated activities within this world.
+2. **Single Client Session**: Users load the game client once; all game modes (Exploration, Combat, Dialogue, Minigames) are accessible within the same runtime context.
+3. **Backend-Authoritative Logic**: All game state, rules, economy, and business logic reside in the NestJS backend; clients are thin rendering layers.
+4. **Type Safety First**: Shared TypeScript types, enums, and DTOs ensure consistency across frontend, backend, and game systems.
+5. **Unified Engine**: Galacean Engine powers all visual rendering (2D/3D) across exploration, combat, dialogue, and minigames.
+6. **ECS-Inspired Architecture**: Entity-Component-System patterns adapted from Aegis Engine, implemented within Galacean's component model.
+7. **Event-Driven Communication**: Pub/Sub event bus for decoupled inter-system communication.
+8. **Asset Delivery via Object Storage**: Game assets (GLB models, PNG sprites) served from S3-compatible storage (MinIO for development).
+9. **Multi-Platform Runtime**: Web (React + Vite) and Mobile (Expo React Native) share core logic via Nx monorepo libraries.
 
 ---
 
@@ -28,9 +34,11 @@
 │                                      │                                  │
 │  ┌───────────────────────────────────▼───────────────────────────────┐ │
 │  │                    @carbuncle/game-engine                          │ │
-│  │  • Scene Manager (Exploration, Minigames, Dialogue, Combat)       │ │
-│  │  • Module Loader (Slots, Fishing, Poker)                          │ │
-│  │  • Asset Pipeline (Sprites, Models, Animations, Audio)            │ │
+│  │  • Entity-Component System (Galacean-adapted ECS)                 │ │
+│  │  • Scene Manager (Exploration, Combat, Dialogue, Minigames)       │ │
+│  │  • Event Bus (Pub/Sub for inter-system communication)             │ │
+│  │  • Module Loader (Minigames: Slots, Fishing, Poker)               │ │
+│  │  • Asset Pipeline (GLB models, PNG sprites from S3/MinIO)         │ │
 │  │  • Input Handler (Touch, Mouse, Keyboard, Gamepad)                │ │
 │  │  • State Sync (Colyseus Client + TanStack Store)                  │ │
 │  └───────────────────────────────────┬───────────────────────────────┘ │
@@ -41,19 +49,20 @@
 │  ┌───────────────────────────────────────────────────────────────────┐ │
 │  │                    NestJS Backend                                 │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────┐ │ │
-│  │  │  Slots Module│  │ Fishing Mdl │  │ Poker Module│  │  Auth    │ │ │
-│  │  │  (Gateway)   │  │ (Gateway)   │  │ (Gateway)   │  │  (JWT)   │ │ │
+│  │  │  RPG Core   │  │ Minigames   │  │  Economy    │  │  Auth    │ │ │
+│  │  │  (Gateway)  │  │ (Gateway)   │  │  (Service)  │  │  (JWT)   │ │ │
 │  │  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └────┬─────┘ │ │
 │  │         │                │                │              │        │ │
 │  │  ┌──────▼────────────────▼────────────────▼──────────────▼─────┐ │ │
 │  │  │                 Core Services                                │ │ │
 │  │  │  • Game State Machine  • Rule Engine  • Matchmaking          │ │ │
-│  │  │  • Economy Service     • Audit Log    • Notification         │ │ │
+│  │  │  • Party Management    • Quest System • Notification         │ │ │
+│  │  │  • Inventory Service   • Audit Log    • Asset Delivery (S3)  │ │ │
 │  │  └──────┬───────────────────────────────────────────────────────┘ │ │
 │  │         │                                                          │ │
 │  │  ┌──────▼───────────────────────────────────────────────────────┐ │ │
 │  │  │                  Colyseus Multiplayer Server                  │ │ │
-│  │  │  • Room Management (Poker Tables, Fishing Arenas, Slot Rooms)│ │ │
+│  │  │  • Room Management (Combat Arenas, Minigame Tables)          │ │ │
 │  │  │  • Real-time State Synchronization (Schema-based)            │ │ │
 │  │  │  • Authority & Anti-Cheat Validation                         │ │ │
 │  │  └──────┬───────────────────────────────────────────────────────┘ │ │
@@ -63,6 +72,7 @@
 │  │                      Data Layer                                    │ │
 │  │  • PostgreSQL (TypeORM + pgvector)  • Redis (Cache + Pub/Sub)     │ │
 │  │  • BullMQ (Job Queues)            • TypeORM Entities               │ │
+│  │  • MinIO (S3-compatible Asset Storage)                             │ │
 │  └────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -74,22 +84,27 @@
 ```
 /workspace/
 ├── apps/
-│   ├── backend/                 # NestJS server (Slots, Fishing, Poker, Auth, Core)
+│   ├── backend/                 # NestJS server (RPG Core, Minigames, Economy, Auth)
 │   ├── backend-e2e/             # Backend E2E tests
 │   ├── frontend/                # React + Galacean (Web)
 │   └── mobile/                  # Expo React Native + Galacean (Mobile) [FUTURE]
 ├── libs/
 │   ├── shared/
 │   │   ├── shared-types/        # CRITICAL: Enums, DTOs, Entities, Interfaces
-│   │   └── game-engine/         # Galacean abstraction, Scene Manager, Module Loader
-│   ├── games/
-│   │   ├── slots/               # Slots-specific logic (shared between client/server)
-│   │   ├── fishing/             # Fishing-specific logic
-│   │   └── poker/               # Poker-specific logic
+│   │   └── game-engine/         # Galacean abstraction, ECS, Scene Manager, Event Bus
+│   ├── rpg/
+│   │   ├── exploration/         # Exploration mode logic (overworld, NPCs, triggers)
+│   │   ├── combat/              # Turn-based combat system
+│   │   ├── dialogue/            # Visual novel-style dialogue system
+│   │   └── party/               # Party management, inventory, equipment
+│   ├── minigames/
+│   │   ├── slots/               # Slots minigame logic
+│   │   ├── fishing/             # Fishing minigame logic
+│   │   └── poker/               # Poker minigame logic
 │   └── ui-kit/                  # Reusable React components (buttons, modals, HUD)
 ├── packages/                    # Publishable packages (future)
-├── archive/                     # Legacy Cocos/Unity projects (reference only)
-└── infra/                       # Docker Compose (PostgreSQL, Redis, PGAdmin)
+├── archive/                     # Reference implementations (Aegis Engine, Persona 3 Dual)
+└── infra/                       # Docker Compose (PostgreSQL, Redis, MinIO, PGAdmin)
 ```
 
 ---
@@ -98,25 +113,37 @@
 
 ### 1. Shared Types Library (`@carbuncle/shared-types`)
 
-**Purpose**: Single source of truth for all data structures, ensuring type safety across client, server, and game modules.
+**Purpose**: Single source of truth for all data structures, ensuring type safety across client, server, and game systems.
 
 #### Key Categories:
 
 **A. Global Enums**
 ```typescript
-// Game Module Identification
-export enum GameModuleId {
-  SLOTS = 'slots',
-  FISHING = 'fishing',
-  POKER = 'poker',
-  // Future: RPG_EXPLORATION, RPG_COMBAT, DIALOGUE
+// Game Mode Identification
+export enum GameModeId {
+  RPG_EXPLORATION = 'rpg_exploration',
+  RPG_COMBAT = 'rpg_combat',
+  RPG_DIALOGUE = 'rpg_dialogue',
+  MINIGAME_SLOTS = 'minigame_slots',
+  MINIGAME_FISHING = 'minigame_fishing',
+  MINIGAME_POKER = 'minigame_poker',
+}
+
+// Scene Types (Galacean Engine)
+export enum SceneType {
+  EXPLORATION = 'exploration',    // Overworld, towns, dungeons
+  COMBAT = 'combat',              // Turn-based battle arena
+  DIALOGUE = 'dialogue',          // Visual novel-style conversations
+  SLOTS = 'slots',                // Slots minigame
+  FISHING = 'fishing',            // Fishing minigame
+  POKER = 'poker',                // Poker minigame
+  LOADING = 'loading',            // Loading/transition scene
 }
 
 // Player Roles & Permissions
 export enum UserRole {
   PLAYER = 'player',
-  DEALER = 'dealer',        // For poker
-  HOST = 'host',            // Room creator
+  PARTY_LEADER = 'party_leader',  // For multiplayer parties
   SPECTATOR = 'spectator',
   ADMIN = 'admin',
 }
@@ -125,58 +152,213 @@ export enum UserRole {
 export enum GameState {
   IDLE = 'idle',
   LOADING = 'loading',
-  PLAYING = 'playing',
+  EXPLORING = 'exploring',
+  IN_COMBAT = 'in_combat',
+  IN_DIALOGUE = 'in_dialogue',
+  PLAYING_MINIGAME = 'playing_minigame',
   PAUSED = 'paused',
   GAME_OVER = 'game_over',
-  WAITING_FOR_PLAYERS = 'waiting_for_players',
 }
 
 // Currency & Economy
 export enum CurrencyType {
-  COINS = 'coins',
-  GEMS = 'gems',
-  TICKETS = 'tickets',      // For tournament entry
+  GOLD = 'gold',        // Primary currency
+  GEMS = 'gems',        // Premium currency
+  TOKENS = 'tokens',    // Minigame-specific tokens
+  REPUTATION = 'reputation', // Faction/trust currency
+}
+
+// Combat-related Enums
+export enum CombatActionType {
+  ATTACK = 'attack',
+  SKILL = 'skill',
+  ITEM = 'item',
+  DEFEND = 'defend',
+  FLEE = 'flee',
+}
+
+export enum TargetType {
+  SINGLE_ENEMY = 'single_enemy',
+  ALL_ENEMIES = 'all_enemies',
+  SINGLE_ALLY = 'single_ally',
+  ALL_ALLIES = 'all_allies',
+  SELF = 'self',
+}
+
+// Character Classes/Archetypes
+export enum CharacterClass {
+  WARRIOR = 'warrior',
+  MAGE = 'mage',
+  ROGUE = 'rogue',
+  HEALER = 'healer',
+  GUNNER = 'gunner',      // For minigame crossover
 }
 ```
 
 **B. Data Transfer Objects (DTOs)**
 ```typescript
-// Universal Player DTO (used across all modules)
+// Universal Player DTO (used across all modes)
 export interface PlayerDTO {
   id: string;
   username: string;
   avatarUrl?: string;
   level: number;
+  experience: number;
   currencies: Record<CurrencyType, number>;
-  currentModule?: GameModuleId;
+  currentMode?: GameModeId;
+  currentScene?: SceneType;
+  partyId?: string;
   lastActiveAt: Date;
 }
 
-// Room Configuration (for matchmaking)
-export interface RoomConfigDTO {
-  roomId: string;
-  moduleId: GameModuleId;
-  maxPlayers: number;
-  minPlayers: number;
-  isPrivate: boolean;
-  entryFee?: { currency: CurrencyType; amount: number };
-  rules: Record<string, any>;  // Module-specific rules
-}
-
-// Game Action Request/Response Pattern
-export interface GameActionRequest<T = any> {
+// Character/Party Member DTO
+export interface CharacterDTO {
+  id: string;
   playerId: string;
-  actionType: string;
-  payload: T;
-  timestamp: number;
+  name: string;
+  class: CharacterClass;
+  level: number;
+  experience: number;
+  health: number;
+  maxHealth: number;
+  stamina: number;
+  maxStamina: number;
+  stats: CharacterStatsDTO;
+  equipment: EquipmentDTO;
+  skills: SkillDTO[];
 }
 
-export interface GameActionResponse<T = any> {
-  success: boolean;
-  newState?: T;
-  errorMessage?: string;
-  timestamp: number;
+export interface CharacterStatsDTO {
+  strength: number;
+  magic: number;
+  dexterity: number;
+  endurance: number;
+  luck: number;
 }
+
+export interface EquipmentDTO {
+  weapon?: ItemDTO;
+  armor?: ItemDTO;
+  accessory?: ItemDTO;
+}
+
+export interface ItemDTO {
+  id: string;
+  name: string;
+  type: ItemType;
+  rarity: ItemRarity;
+  stats?: Record<string, number>;
+  effects?: string[];
+}
+
+export enum ItemType {
+  WEAPON = 'weapon',
+  ARMOR = 'armor',
+  ACCESSORY = 'accessory',
+  CONSUMABLE = 'consumable',
+  MATERIAL = 'material',
+  KEY_ITEM = 'key_item',
+}
+
+export enum ItemRarity {
+  COMMON = 'common',
+  UNCOMMON = 'uncommon',
+  RARE = 'rare',
+  EPIC = 'epic',
+  LEGENDARY = 'legendary',
+}
+
+export interface SkillDTO {
+  id: string;
+  name: string;
+  description: string;
+  cost: { type: CurrencyType | 'stamina' | 'mana'; amount: number };
+  targetType: TargetType;
+  effect: SkillEffectDTO;
+  cooldown?: number; // in turns
+}
+
+export interface SkillEffectDTO {
+  type: 'damage' | 'heal' | 'buff' | 'debuff' | 'status';
+  value: number;
+  duration?: number; // in turns
+  statusEffect?: StatusEffectType;
+}
+
+export enum StatusEffectType {
+  POISON = 'poison',
+  PARALYSIS = 'paralysis',
+  SLEEP = 'sleep',
+  CONFUSION = 'confusion',
+  BERSERK = 'berserk',
+  SHIELD = 'shield',
+  REGEN = 'regen',
+}
+
+// Combat Action DTO
+export interface CombatActionDTO {
+  characterId: string;
+  actionType: CombatActionType;
+  targetIds: string[];
+  skillId?: string;
+  itemId?: string;
+}
+
+// Exploration DTOs
+export interface ExplorationStateDTO {
+  currentMap: string;
+  playerPosition: Vector2DTO;
+  activeNPCs: NPCDTO[];
+  activeTriggers: TriggerDTO[];
+  discoveredAreas: string[];
+  chestStates: Record<string, boolean>; // chestId -> opened
+}
+
+export interface Vector2DTO {
+  x: number;
+  y: number;
+}
+
+export interface NPCDTO {
+  id: string;
+  name: string;
+  position: Vector2DTO;
+  dialogueTreeId?: string;
+  isInteractable: boolean;
+}
+
+export interface TriggerDTO {
+  id: string;
+  type: 'teleport' | 'event' | 'battle' | 'cutscene';
+  position: Vector2DTO;
+  radius: number;
+  triggered: boolean;
+  data: any;
+}
+
+// Dialogue DTOs
+export interface DialogueStateDTO {
+  dialogueTreeId: string;
+  currentNodeId: string;
+  participants: string[]; // character IDs
+  choices: DialogueChoiceDTO[];
+}
+
+export interface DialogueChoiceDTO {
+  id: string;
+  text: string;
+  nextNodeId: string;
+  requirements?: DialogueRequirementDTO[];
+}
+
+export interface DialogueRequirementDTO {
+  type: 'stat' | 'item' | 'reputation' | 'flag';
+  key: string;
+  value: number | string;
+  comparison: 'equals' | 'greaterThan' | 'lessThan' | 'has';
+}
+
+// Minigame-specific DTOs will be added in their respective sections
 ```
 
 **C. Database Entities (TypeORM)**
@@ -205,15 +387,145 @@ export class User extends BaseEntity {
   @Column('jsonb')
   currencies: Record<CurrencyType, number>;
 
+  @Column()
+  level: number;
+
+  @Column()
+  experience: number;
+
+  @OneToMany(() => Character, (character) => character.owner)
+  characters: Character[];
+
   @OneToMany(() => GameSession, (session) => session.player)
   gameSessions: GameSession[];
 }
 
-// Game Session Tracking
+// Character Entity (Party Members)
+@Entity('characters')
+export class Character extends BaseEntity {
+  @Column()
+  ownerId: string;
+
+  @ManyToOne(() => User, (user) => user.characters)
+  owner: User;
+
+  @Column()
+  name: string;
+
+  @Column({ type: 'enum', enum: CharacterClass })
+  class: CharacterClass;
+
+  @Column()
+  level: number;
+
+  @Column()
+  experience: number;
+
+  @Column()
+  health: number;
+
+  @Column()
+  maxHealth: number;
+
+  @Column()
+  stamina: number;
+
+  @Column()
+  maxStamina: number;
+
+  @Column('jsonb')
+  stats: CharacterStatsDTO;
+
+  @Column('jsonb')
+  equipment: EquipmentDTO;
+
+  @Column('jsonb')
+  skills: SkillDTO[];
+
+  @Column('jsonb')
+  inventory: ItemDTO[];
+}
+
+// Party Entity
+@Entity('parties')
+export class Party extends BaseEntity {
+  @Column()
+  leaderId: string;
+
+  @Column('jsonb')
+  memberIds: string[]; // character IDs
+
+  @Column()
+  currentMap?: string;
+
+  @Column('jsonb')
+  sharedQuests: QuestProgressDTO[];
+}
+
+// Quest/Task Entity
+@Entity('quests')
+export class Quest extends BaseEntity {
+  @Column()
+  title: string;
+
+  @Column()
+  description: string;
+
+  @Column('jsonb')
+  objectives: QuestObjectiveDTO[];
+
+  @Column()
+  difficulty: 'easy' | 'medium' | 'hard' | 'epic';
+
+  @Column('jsonb')
+  rewards: {
+    experience: number;
+    gold: number;
+    items?: ItemDTO[];
+    reputation?: { factionId: string; amount: number };
+  };
+}
+
+// Quest Progress Tracking
+@Entity('quest_progress')
+export class QuestProgress extends BaseEntity {
+  @Column()
+  questId: string;
+
+  @Column()
+  characterId: string;
+
+  @Column('jsonb')
+  objectiveProgress: Record<number, number>; // objectiveIndex -> progress
+
+  @Column()
+  status: 'active' | 'completed' | 'failed' | 'abandoned';
+
+  @Column('jsonb')
+  completedAt?: Date;
+}
+
+// Inventory/Item Storage
+@Entity('inventories')
+export class Inventory extends BaseEntity {
+  @Column()
+  ownerId: string; // character ID or party ID
+
+  @Column()
+  ownerType: 'character' | 'party' | 'account';
+
+  @Column('jsonb')
+  items: ItemDTO[];
+
+  @Column()
+  capacity: number;
+}
+
+// Game Session Tracking (for minigames and combat)
 @Entity('game_sessions')
 export class GameSession extends BaseEntity {
   @Column()
-  moduleId: GameModuleId;
+  modeId: GameModeId;
 
   @ManyToOne(() => User, (user) => user.gameSessions)
   player: User;
@@ -228,19 +540,69 @@ export class GameSession extends BaseEntity {
   finalState: any;
 
   @Column()
-  result: 'win' | 'loss' | 'draw' | 'abandoned';
+  result: 'win' | 'loss' | 'draw' | 'abandoned' | 'completed';
+
+  @Column('jsonb')
+  rewards: {
+    experience: number;
+    gold: number;
+    items?: ItemDTO[];
+  };
+}
+
+// NPC Entity
+@Entity('npcs')
+export class NPC extends BaseEntity {
+  @Column()
+  name: string;
+
+  @Column()
+  mapId: string;
+
+  @Column('jsonb')
+  position: Vector2DTO;
+
+  @Column()
+  dialogueTreeId?: string;
+
+  @Column('jsonb')
+  interactionData: any;
+}
+
+// Map/Area Entity
+@Entity('maps')
+export class GameMap extends BaseEntity {
+  @Column()
+  name: string;
+
+  @Column()
+  type: 'town' | 'dungeon' | 'overworld' | 'arena' | 'minigame';
+
+  @Column()
+  parentMapId?: string; // for nested areas
+
+  @Column('jsonb')
+  bounds: { x: number; y: number; width: number; height: number };
+
+  @Column('jsonb')
+  teleportPoints: TeleportPointDTO[];
+
+  @Column('jsonb')
+  triggerZones: TriggerZoneDTO[];
 }
 ```
 
-**D. Module-Specific DTOs**
+**D. Minigame-Specific DTOs**
 
-*Slots:*
+*Note: These minigames are integrated activities within the RPG world, accessible at specific locations (casinos, fishing spots, card tables).*
+
+*Slots Minigame:*
 ```typescript
 export enum SlotVariant {
-  TH = 'th',           // Tien Hiep (20 paylines)
-  TP = 'tp',           // Than Tai (25 paylines)
-  VQMM = 'vqmm',       // Bonus wheel
-  PHONG_THAN = 'phong_than',
+  LUCKY_CARBY = 'lucky_carby',      // Classic 3-reel, 5 paylines
+  SEVEN_SEAS = 'seven_seas',        // 5-reel, 20 paylines, pirate theme
+  CRYSTAL_FORTUNE = 'crystal_fortune', // 5-reel, 25 paylines, gem theme
+  DRAGON_WHEEL = 'dragon_wheel',    // Bonus wheel feature
 }
 
 export interface SpinRequestDTO {
@@ -253,7 +615,7 @@ export interface SpinRequestDTO {
 export interface SpinResultDTO {
   spinId: string;
   reels: number[][];           // [reelIndex][rowIndex] = symbolId
-  paylines: PaylineResult[];
+  paylines: PaylineResultDTO[];
   totalWin: number;
   bonusTriggered?: BonusGameDTO;
   newState: SlotMachineStateDTO;
@@ -266,9 +628,23 @@ export interface PaylineResultDTO {
   winAmount: number;
   positions: { reel: number; row: number }[];
 }
+
+export interface BonusGameDTO {
+  type: 'wheel' | 'free_spins' | 'pick_em';
+  initialSpins?: number;
+  multiplier?: number;
+}
+
+export interface SlotMachineStateDTO {
+  variant: SlotVariant;
+  currentCredits: number;
+  lastWin: number;
+  inBonusRound: boolean;
+  freeSpinsRemaining: number;
+}
 ```
 
-*Fishing:*
+*Fishing Minigame:*
 ```typescript
 export enum FishType {
   SMALL_FISH = 'small_fish',
@@ -276,6 +652,7 @@ export enum FishType {
   LARGE_FISH = 'large_fish',
   BOSS_FISH = 'boss_fish',
   SPECIAL_FISH = 'special_fish',  // Bomb, Lightning, etc.
+  RARE_FISH = 'rare_fish',        // Collectible rare species
 }
 
 export interface ShootRequestDTO {
@@ -290,7 +667,7 @@ export interface FishSpawnDTO {
   typeId: FishType;
   health: number;
   speed: number;
-  path: Vector2[];
+  path: Vector2DTO[];
   rewardMultiplier: number;
 }
 
@@ -300,10 +677,19 @@ export interface CatchResultDTO {
   damageDealt: number;
   reward: number;
   isKill: boolean;
+  fishCollected?: boolean; // For rare fish collection
+}
+
+export interface FishingArenaStateDTO {
+  arenaId: string;
+  players: string[]; // player IDs
+  activeFish: FishSpawnDTO[];
+  timeRemaining: number;
+  leaderboard: { playerId: string; score: number }[];
 }
 ```
 
-*Poker:*
+*Poker Minigame:*
 ```typescript
 export enum PokerStage {
   PREFLOP = 'preflop',
@@ -335,6 +721,8 @@ export interface PokerRoomStateDTO {
   players: PokerPlayerStateDTO[];
   pot: { main: number; sidePots: SidePotDTO[] };
   currentBet: number;
+  smallBlind: number;
+  bigBlind: number;
 }
 
 export interface PokerPlayerStateDTO {
@@ -345,29 +733,146 @@ export interface PokerPlayerStateDTO {
   hasFolded: boolean;
   isAllIn: boolean;
   lastAction?: PokerAction;
+  seatIndex: number;
+}
+
+export interface SidePotDTO {
+  amount: number;
+  eligiblePlayerIds: string[];
 }
 ```
 
 ---
-
 ### 2. Game Engine Library (`@carbuncle/game-engine`)
 
-**Purpose**: Galacean Engine abstraction layer providing scene management, module loading, asset handling, and state synchronization.
+**Purpose**: Galacean Engine abstraction layer providing ECS-inspired architecture, scene management, event bus, module loading, asset handling, and state synchronization. Adapts patterns from Aegis Engine for the Galacean environment.
+
+#### Core Architectural Patterns (from Aegis Engine)
+
+The game engine implements a hybrid Entity-Component-System architecture inspired by the Aegis Engine:
+
+1. **Entity**: Lightweight identifier containing Components (Galacean Entity)
+2. **Component**: Pluggable logic nodes attached to Entities (Galacean Script/Component)
+3. **System**: Singletons handling game rules/state logic using Pub/Sub events
+4. **Manager**: Hardware abstraction layer for heavy computation/memory management
+5. **Event Bus**: ETL-based Pub/Sub for inter-module communication
+
+#### Execution Sequence
+```
+Poll Input → Update Systems → Update Components → Process Managers → Compute
+```
 
 #### Core Modules:
 
-**A. Scene Manager**
+**A. Entity-Component System**
 ```typescript
-// Scene Types
-export enum SceneType {
-  HUB = 'hub',                  // Future: RPG exploration area
-  SLOTS = 'slots',
-  FISHING = 'fishing',
-  POKER = 'poker',
-  DIALOGUE = 'dialogue',        // Future: Visual novel
-  COMBAT = 'combat',            // Future: Turn-based combat
+// Entity - Lightweight identifier wrapper around Galacean Entity
+export class CarbuncleEntity {
+  readonly id: string;
+  private galaceanEntity: Entity;
+  private components: Map<string, Component> = new Map();
+
+  constructor(entity: Entity);
+  
+  addComponent<T extends Component>(component: T): T;
+  getComponent<T extends Component>(type: new (...args: any[]) => T): T | null;
+  removeComponent(componentType: string): void;
+  hasComponent(componentType: string): boolean;
 }
 
+// Base Component - Attachable logic node
+export abstract class CarbuncleComponent {
+  entity: CarbuncleEntity | null = null;
+  name: string;
+
+  onAttach(entity: CarbuncleEntity): void;
+  onDetach(): void;
+  onUpdate?(deltaTime: number): void;
+  onFixedUpdate?(): void;
+}
+
+// System - Singleton handling game rules with Pub/Sub
+export abstract class CarbuncleSystem {
+  readonly systemId: string;
+  protected eventBus: EventBus;
+
+  constructor(eventBus: EventBus);
+  
+  initialize(): void;
+  update(deltaTime: number): void;
+  onEvent<T>(eventType: string, handler: (data: T) => void): void;
+  emitEvent<T>(eventType: string, data: T): void;
+}
+
+// Manager - Heavy computation and resource management
+export abstract class ResourceManager {
+  readonly managerId: string;
+  protected memoryPool: MemoryPool;
+
+  allocate(size: number): MemoryBlock;
+  free(block: MemoryBlock): void;
+  processBatch(items: any[]): any[];
+}
+```
+
+**B. Event Bus (Pub/Sub)**
+```typescript
+// Event definition
+export interface GameEvent<T = any> {
+  type: string;
+  payload: T;
+  timestamp: number;
+  source?: string; // system/component ID
+}
+
+// Event Bus - Central pub/sub hub
+export class EventBus {
+  private subscribers: Map<string, Set<(event: GameEvent) => void>> = new Map();
+
+  subscribe<T>(eventType: string, handler: (event: GameEvent<T>) => void): () => void;
+  publish<T>(eventType: string, payload: T, source?: string): void;
+  clear(): void;
+}
+
+// Common Event Types
+export enum GameEventType {
+  // Exploration
+  PLAYER_MOVED = 'player_moved',
+  NPC_INTERACTED = 'npc_interacted',
+  TRIGGER_ENTERED = 'trigger_entered',
+  TRIGGER_EXITED = 'trigger_exited',
+  CHEST_OPENED = 'chest_opened',
+  
+  // Combat
+  COMBAT_STARTED = 'combat_started',
+  TURN_STARTED = 'turn_started',
+  ACTION_EXECUTED = 'action_executed',
+  DAMAGE_DEALT = 'damage_dealt',
+  STATUS_APPLIED = 'status_applied',
+  ENEMY_DEFEATED = 'enemy_defeated',
+  COMBAT_ENDED = 'combat_ended',
+  
+  // Dialogue
+  DIALOGUE_STARTED = 'dialogue_started',
+  DIALOGUE_CHOICE_MADE = 'dialogue_choice_made',
+  DIALOGUE_ENDED = 'dialogue_ended',
+  
+  // Minigames
+  MINIGAME_STARTED = 'minigame_started',
+  MINIGAME_ACTION = 'minigame_action',
+  MINIGAME_RESULT = 'minigame_result',
+  MINIGAME_ENDED = 'minigame_ended',
+  
+  // Economy
+  ITEM_ACQUIRED = 'item_acquired',
+  ITEM_USED = 'item_used',
+  CURRENCY_CHANGED = 'currency_changed',
+  QUEST_UPDATED = 'quest_updated',
+}
+```
+
+**C. Scene Manager**
+```typescript
 // Scene Configuration
 export interface SceneConfig {
   sceneId: SceneType;
@@ -381,19 +886,23 @@ export interface SceneConfig {
 export class SceneManager {
   private currentScene: Scene | null = null;
   private sceneRegistry: Map<SceneType, SceneConfig> = new Map();
+  private eventBus: EventBus;
+
+  constructor(eventBus: EventBus);
 
   registerScene(config: SceneConfig): void;
   async loadScene(sceneId: SceneType): Promise<void>;
   async unloadScene(): Promise<void>;
   getCurrentScene(): Scene | null;
+  getSceneType(): SceneType | null;
 }
 ```
 
-**B. Module Loader (Minigame System)**
+**D. Module Loader (Minigame System)**
 ```typescript
-// Game Module Interface
-export interface GameModule {
-  moduleId: GameModuleId;
+// Game Module Interface - For minigames within RPG
+export interface MinigameModule {
+  modeId: GameModeId;
   sceneId: SceneType;
 
   // Lifecycle
@@ -414,20 +923,23 @@ export interface GameModule {
 
 // Module Registry
 export class ModuleLoader {
-  private modules: Map<GameModuleId, GameModule> = new Map();
+  private modules: Map<GameModeId, MinigameModule> = new Map();
+  private eventBus: EventBus;
 
-  registerModule(module: GameModule): void;
-  getModule(moduleId: GameModuleId): GameModule | undefined;
-  async switchModule(targetModuleId: GameModuleId, roomId?: string): Promise<void>;
+  constructor(eventBus: EventBus);
+
+  registerModule(module: MinigameModule): void;
+  getModule(modeId: GameModeId): MinigameModule | undefined;
+  async switchModule(targetModeId: GameModeId, roomId?: string): Promise<void>;
 }
 ```
 
-**C. Asset Pipeline**
+**E. Asset Pipeline (S3/MinIO Integration)**
 ```typescript
 // Asset Manifest Structure
 export interface AssetManifest {
-  sprites: AssetEntry[];
-  models: AssetEntry[];
+  sprites: AssetEntry[];      // PNG sprites
+  models: AssetEntry[];       // GLB models
   animations: AssetEntry[];
   audio: AssetEntry[];
   fonts: AssetEntry[];
@@ -436,23 +948,38 @@ export interface AssetManifest {
 
 export interface AssetEntry {
   id: string;
-  path: string;
+  path: string;               // S3 key / MinIO path
   type: 'sprite' | 'model' | 'animation' | 'audio' | 'font' | 'shader';
+  format: 'png' | 'glb' | 'mp3' | 'ogg' | 'ttf';
   preload: boolean;
-  bundle?: string;  // For lazy loading
+  bundle?: string;            // For lazy loading
+  size?: number;              // File size in bytes
 }
 
-// Asset Loader Service
+// Asset Loader Service with S3/MinIO support
 export class AssetLoader {
   private loadedAssets: Map<string, any> = new Map();
   private manifest: AssetManifest;
+  private s3Client: S3Client;
+  private bucketName: string;
 
-  constructor(manifest: AssetManifest);
+  constructor(manifest: AssetManifest, s3Config: S3Config);
 
   preload(bundle?: string): Promise<void>;
   getAsset<T>(assetId: string): T;
   unload(assetId: string): void;
   unloadBundle(bundle: string): void;
+  downloadAsset(assetId: string): Promise<void>;
+}
+
+// S3 Configuration
+export interface S3Config {
+  endpoint: string;           // MinIO URL for dev, S3 for prod
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  region?: string;
+  useSSL: boolean;
 }
 ```
 
