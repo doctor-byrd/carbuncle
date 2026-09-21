@@ -1,0 +1,29 @@
+{
+    "name": "Persona 3 Dual Dev Container",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "target": "devcontainer",
+        "context": ".."
+    },
+    "runArgs": [
+        // gdb should be able to connect to melonDS gdbstub (which runs native on Host)
+        "--add-host=host.docker.internal:host-gateway"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.cpptools",
+                "ms-python.python"
+            ]
+        }
+    },
+    // move the ENV to the remote sesion, so it isn't present on build time
+    "remoteEnv": {
+        "PATH": "/home/aigis/.venv/bin:${containerEnv:PATH}",
+        "ARM_GCC": "/opt/wonderful/toolchain/gcc-arm-none-eabi",
+        "BLOCKSDSLIBS": "${containerEnv:BLOCKSDS}/libs"
+    },
+    // mount to /work (BlocksDS Docker image automatically mounts to /work)
+    "workspaceMount": "source=${localWorkspaceFolder},target=/work,type=bind,consistency=cached",
+    "workspaceFolder": "/work"
+}

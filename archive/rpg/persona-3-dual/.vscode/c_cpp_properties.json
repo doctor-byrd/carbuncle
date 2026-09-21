@@ -1,0 +1,37 @@
+{
+    "version": 4,
+    "configurations": [
+        {
+            "name": "CMake Project",
+            "compileCommands": [
+                "${workspaceFolder}/out/build/host-debug/compile_commands.json"
+            ],
+            "intelliSenseMode": "${default}",
+            "forcedInclude": [
+                "${workspaceFolder}/include/vscode_fix.hpp"
+            ],
+            "includePath": [
+                "${workspaceFolder}/include/**",
+                "${workspaceFolder}/source/**",
+                "${workspaceFolder}/libs/aegis_engine/include/**",
+                "${workspaceFolder}/libs/aegis_engine/libs/**",
+                "${workspaceFolder}/libs/p3d-qoa/include/**",
+                "${workspaceFolder}/libs/p3d-qoa/libs/**",
+                "${env:ARM_GCC}/arm-none-eabi/include/**",
+                "${env:BLOCKSDSLIBS}/dswifi/include/**",
+                "${env:BLOCKSDSLIBS}/libnds/include/**",
+                "${env:BLOCKSDSLIBS}/libteak/include/**",
+                "${env:BLOCKSDSLIBS}/libxm7/include/**",
+                "${env:BLOCKSDSLIBS}/maxmod/include/**",
+                "${workspaceFolder}/build/persona-3-dual/maxmod/**",
+                "${workspaceFolder}/build/persona-3-dual/maxmod",
+            ],
+            "defines": [
+                "ARM9",
+                "__NDS__"
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+        }
+    ]
+}

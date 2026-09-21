@@ -1,0 +1,39 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "[Docker] (gdb) Connect to melonDS",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/out/build/nds-debug-sdcard/persona-3-dual.elf",
+            "targetArchitecture": "arm",
+            "serverLaunchTimeout": 10000,
+            "stopAtEntry": true,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb-multiarch",
+            "miDebuggerServerAddress": "host.docker.internal:2345",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "customLaunchSetupCommands": [
+                {
+                    "text": "target remote host.docker.internal:2345",
+                    "description": "Connect to melonDS",
+                    "ignoreFailures": false
+                },
+                {
+                    "text": "symbol-file \"${workspaceFolder}/out/build/nds-debug-sdcard/persona-3-dual.elf\"",
+                    "description": "Force load symbols",
+                    "ignoreFailures": false
+                },
+            ]
+        }
+    ]
+}
