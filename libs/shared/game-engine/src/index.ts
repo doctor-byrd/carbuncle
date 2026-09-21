@@ -2,6 +2,8 @@ export * from './lib/game-engine.js';
 
 // Export Types
 export * from './lib/types/scene.js';
+export * from './lib/types/game.enums.js';
+export * from './lib/types/game.dto.js';
 
 // Export Core Lifecycle Hooks
 export * from './lib/engine/galeaceanEngine.js';

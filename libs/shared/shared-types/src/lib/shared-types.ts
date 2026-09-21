@@ -15,6 +15,7 @@ export enum SceneId {
 export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
+  PLAYER = 'player',
 }
 
 export enum UserStatus {
