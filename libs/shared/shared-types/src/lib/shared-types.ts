@@ -56,3 +56,98 @@ export enum ChannelType {
   TEAM = 'team',
 }
 
+// ============================================================================
+// ASSET MANAGEMENT ENUMS
+// ============================================================================
+
+/**
+ * Asset categories for organizing game resources in S3/MinIO.
+ * Maps to bucket folder structure: carbuncle-assets/{category}/{subPath}
+ */
+export enum AssetCategory {
+  CHARACTERS = 'characters',
+  ENEMIES = 'enemies',
+  BACKGROUNDS = 'backgrounds',
+  UI = 'ui',
+  AUDIO = 'audio',
+  SPRITES = 'sprites',
+  ANIMATIONS = 'animations',
+  PARTICLES = 'particles',
+  FONTS = 'fonts',
+  MISC = 'misc',
+}
+
+/**
+ * Specific character asset types for player/NPC sprites.
+ */
+export enum CharacterAssetType {
+  PORTRAIT = 'portrait',
+  SPRITE_SHEET = 'sprite_sheet',
+  BATTLE_SPRITE = 'battle_sprite',
+  THUMBNAIL = 'thumbnail',
+  AVATAR = 'avatar',
+}
+
+/**
+ * Audio asset types for music and sound effects.
+ */
+export enum AudioAssetType {
+  BGM = 'bgm',              // Background music
+  BATTLE_THEME = 'battle_theme',
+  SE = 'se',                // Sound effect
+  VOICE = 'voice',          // Voice clips
+  AMBIENT = 'ambient',      // Environmental audio
+}
+
+/**
+ * File formats supported by the asset pipeline.
+ */
+export enum AssetFormat {
+  // Images
+  PNG = 'png',
+  JPG = 'jpg',
+  WEBP = 'webp',
+  SVG = 'svg',
+  GIF = 'gif',
+  
+  // Audio
+  MP3 = 'mp3',
+  OGG = 'ogg',
+  WAV = 'wav',
+  
+  // Animation/Sprite data
+  JSON = 'json',
+  ATLAS = 'atlas',
+  
+  // Fonts
+  TTF = 'ttf',
+  WOFF = 'woff',
+  WOFF2 = 'woff2',
+}
+
+/**
+ * Asset visibility levels for access control.
+ */
+export enum AssetVisibility {
+  PUBLIC = 'public',        // Accessible without auth (presigned or anonymous)
+  AUTHENTICATED = 'authenticated',  // Requires valid user session
+  ADMIN_ONLY = 'admin_only',        // Restricted to admins
+}
+
+/**
+ * AssetMetadata interface
+ * Stores metadata about uploaded game assets in S3/MinIO.
+ */
+export interface IAssetMetadata {
+  id: string;
+  category: AssetCategory;
+  assetKey: string;
+  filename: string;
+  mimeType: string;
+  fileSize: number;
+  visibility: AssetVisibility;
+  ownerId?: string;
+  tags?: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}

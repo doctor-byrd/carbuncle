@@ -1,4 +1,4 @@
-import { UserRole, UserStatus, FriendshipStatus } from './shared-types.js';
+import { UserRole, UserStatus, FriendshipStatus, AssetCategory, AssetVisibility, } from './shared-types.js';
 import { 
     Entity, 
     Column, 
@@ -78,6 +78,41 @@ export class UserSetting {
   @ManyToOne(() => User, (user) => user.settings, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user: User;
+}
+
+@Entity({ name: 'asset_metadata' })
+export class AssetMetadata extends BaseEntity {
+
+  @Column({
+    type: 'varchar',
+    length: 50,
+  })
+  category!: AssetCategory | string;
+
+  @Column({ name: 'asset_key', unique: true })
+  assetKey!: string;
+
+  @Column()
+  filename!: string;
+
+  @Column({ name: 'mime_type' })
+  mimeType!: string;
+
+  @Column({ name: 'file_size', type: 'bigint' })
+  fileSize!: number;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: AssetVisibility.PUBLIC,
+  })
+  visibility!: AssetVisibility | string;
+
+  @Column({ name: 'owner_id', nullable: true })
+  ownerId?: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  tags?: Record<string, unknown>;
 }
 
 @Entity('player_profiles')
