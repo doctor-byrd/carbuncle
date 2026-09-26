@@ -81,6 +81,35 @@ New enums/DTOs required in `@org/game-engine`:
 - `enum TriggerType`, `enum OverworldEnemyState`, `enum EntryAdvantage { PartyInitiative, EnemyInitiative, Backstab, Neutral }`
 - `interface StageManifestDto`, `PlayerSnapshotDto`, `InteractRequestDto`, `OverworldStrikeDto`, `EncounterDto`, `DestructibleBrokenDto`, `RubberBandDto`
 
+## 4A. Client-Side Galacean Engine Amendments
+The current `@org/game-engine` runtime scaffolding is a sound foundation but requires five targeted extensions to fully support the free-run RPG described in §4:
+
+### 4A.1 Typed EventBus (Required)
+- **Gap**: No event bus exists yet; legacy Aegis `engineBus`/`BroadcastEvent` has no client counterpart.
+- **Change**: Implement a typed pub/sub `EventBus` keyed by `GameEventType` in `libs/rpg/core/event-bus.ts`, mirroring §8's event catalog. All scene systems, the snapshot sender, and UI HUD subscribe through it — never direct cross-module imports.
+
+### 4A.2 Persistent Multi-Scene Management (Required)
+- **Gap**: Current scene manager purges the full scene on transition. Free-run → battle transitions must preserve stage state (enemies alive, crates broken, player position) for return-to-overworld.
+- **Change**: Support add/remove of scenes without global purge (Galacean multi-scene mode), with an explicit `StageStateCache` holding authoritative DTOs received from the server so re-entry restores exact world state.
+
+### 4A.3 Typed Resource Loading (Required)
+- **Gap**: Resource loading is untyped string-path based.
+- **Change**: Wrap loader calls in typed helpers keyed to the asset taxonomy in `@org/shared-types` (GLB stages, rigged characters, animation clips, VFX prefabs, audio banks) so missing/misnamed assets fail fast at load time, not at render time.
+
+### 4A.4 Extensible Scene IDs + Enter Parameters (Required)
+- **Gap**: Scene IDs are hardcoded; no parameterization for entering a scene with context.
+- **Change**: Extend the scene registry with dynamic IDs (`Stage:<id>`, `Battle:<encounterId>`) and a typed `EnterParams { spawnPoint?, snapshot?, encounterDto? }` contract so transitions carry server DTOs (§4.2, §4.3) into the new scene.
+
+### 4A.5 Physics Integration (Required)
+- **Gap**: No physics package wired in; free-run movement, jumping, verticality, and trigger volumes all depend on it.
+- **Change**: Integrate `@galacean/engine-physics-lite` (or the PhysX-backed package if budget allows) for:
+  - Character controller: capsule collider + grounded checks for run/jump/light platforming (see §4.1 verticality).
+  - Trigger volumes: `onTriggerEnter/Exit` driving the §4.1 trigger registry (`SavePoint`, `EnemyPatrol`, `Destructible`, etc.).
+  - Overworld strike detection: attack hitbox as short-lived trigger against enemy colliders → emits `OVERWORLD_STRIKE` per §4.3.
+  - Destructibles: simple rigidbody break response is cosmetic only; loot/drops remain server-authoritative.
+
+**Light platforming note**: With the character controller above, one-hop ledges, moving platforms (kinematic colliders authored in stage GLBs), and jump pads (trigger-driven velocity impulses declared in the stage manifest) are feasible without engine changes beyond 4A.5. Keep gaps within double-jump-free reach unless a stage opts into enhanced mobility via manifest flags.
+
 ## 5. Dialogue System
 - Linked-node trees (`Dialogue` nodes with prev/next/selections).
 - V1 port uses simple linked lists; future migration to node-graph DTOs.
@@ -115,6 +144,6 @@ Map legacy `EventID` to `GameEventType` (plus new free-run events):
 - **P0**: Contract reconciliation + new DTOs (§4.5, `EncounterDto`, `TurnResolvedDto`, etc.).
 - **P1**: `libs/rpg/combat`: Pure `RulesEngine` unit-tested against legacy values; `BattleStateMachine`; entry-advantage modifiers from §4.3 feed battle initialization.
 - **P2**: Backend `RpgModule`: Stage manifest service, snapshot validator (anti-cheat plausibility checks), interact/strike/destructible endpoints, encounter launcher, Redis battle sessions, save endpoints.
-- **P3**: `libs/rpg/exploration`: Stage manifest schema + `.jmap`→trigger-volume migration tooling, client character controller (run/jump/verticality), trigger registry, overworld enemy AI states, snapshot sender.
-- **P4**: Frontend Galacean scenes: Free-run exploration scene (third-person camera, collision/navmesh), strike/destructible VFX feedback, Battle HUD, Dialogue renderer.
+- **P3**: `libs/rpg/exploration`: Stage manifest schema + `.jmap`→trigger-volume migration tooling, client character controller (run/jump/verticality), trigger registry, overworld enemy AI states, snapshot sender. Engine prerequisites from §4A land here or earlier: EventBus (§4A.1) is a P1 dependency; physics integration (§4A.5) blocks this phase.
+- **P4**: Frontend Galacean scenes: Free-run exploration scene (third-person camera, collision/navmesh), strike/destructible VFX feedback, Battle HUD, Dialogue renderer. Includes §4A.2 persistent multi-scene management, §4A.3 typed resource loading, and §4A.4 extensible scene IDs with enter parameters.
 - **P5**: Content DBs as data seeds (JSON/Postgres): stage manifests, encounter tables, loot/drop tables, enemy archetype configs.

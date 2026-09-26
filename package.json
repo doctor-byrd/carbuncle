@@ -57,6 +57,7 @@
     "@colyseus/tools": "^0.18.3",
     "@colyseus/ws-transport": "^0.18.2",
     "@galacean/engine": "^1.6.13",
+    "@galacean/engine-physics-lite": "^1.6.13",
     "@galacean/engine-toolkit": "^1.6.0",
     "@galacean/gui": "^1.2.1",
     "@nestjs/bullmq": "^12.0.0",
