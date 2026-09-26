@@ -182,6 +182,92 @@ export class MultiplayerSyncScript extends Script {
 }
 ```
 
+Upload an asset:
+```ts
+import { useUploadAsset } from '@/lib/queries';
+
+function AssetUploader() {
+  const uploadMutation = useUploadAsset({
+    onSuccess: (data) => {
+      console.log('Upload complete!', data.assetId);
+    },
+    onError: (error) => {
+      console.error('Upload failed', error);
+    },
+  });
+
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    uploadMutation.mutate({
+      file,
+      category: 'characters',
+      subPath: 'player/male',
+      filename: file.name,
+      mimeType: file.type,
+      fileSize: file.size,
+    });
+  };
+
+  return (
+    <div>
+      <input type="file" onChange={handleFileSelect} />
+      {uploadMutation.isPending && <p>Uploading...</p>}
+    </div>
+  );
+}
+```
+
+Load Character Portrait
+```ts
+import { useAssetUrl } from '@/lib/queries';
+import { SceneId } from '@org/shared-types';
+
+function CharacterPortrait({ characterId }: { characterId: string }) {
+  const portraitUrl = useAssetUrl(characterId);
+
+  if (!portraitUrl) return <div>Loading...</div>;
+
+  return (
+    <img
+      src={portraitUrl}
+      alt="Character Portrait"
+      onLoad={() => console.log('Portrait loaded')}
+      onError={() => console.error('Failed to load portrait')}
+    />
+  );
+}
+```
+
+List Background Assets
+```ts
+import { useAssetsByCategory } from '@/lib/queries';
+import { AssetCategory } from '@org/shared-types';
+
+function BackgroundSelector() {
+  const { data, isLoading, error } = useAssetsByCategory(AssetCategory.BACKGROUNDS, {
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  if (isLoading) return <div>Loading backgrounds...</div>;
+  if (error) return <div>Error loading backgrounds</div>;
+
+  return (
+    <div className="background-grid">
+      {data?.data.map((asset) => (
+        <img
+          key={asset.id}
+          src={asset.url}
+          alt={asset.filename}
+          className="background-thumbnail"
+        />
+      ))}
+    </div>
+  );
+}
+```
+
 ### Web Client
 Run frontend:
 ```sh
