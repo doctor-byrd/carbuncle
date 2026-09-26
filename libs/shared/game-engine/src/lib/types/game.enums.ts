@@ -32,16 +32,6 @@ export enum SceneType {
 }
 
 /**
- * Player roles and permissions within game sessions.
- */
-export enum UserRole {
-  PLAYER = 'player',
-  PARTY_LEADER = 'party_leader',    // For multiplayer parties
-  SPECTATOR = 'spectator',
-  ADMIN = 'admin',
-}
-
-/**
  * Current state of the game session.
  */
 export enum GameState {

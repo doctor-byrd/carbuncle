@@ -16,6 +16,8 @@ export enum UserRole {
   USER = 'user',
   ADMIN = 'admin',
   PLAYER = 'player',
+  PARTY_LEADER = 'party_leader',    // For multiplayer parties
+  SPECTATOR = 'spectator',
 }
 
 export enum UserStatus {

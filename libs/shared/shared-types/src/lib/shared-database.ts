@@ -14,7 +14,7 @@ import {
     JoinColumn,
     Unique, 
 } from 'typeorm';
-import { AchievementCategory, ArmorType, CharacterClass, ElementType, EquipmentSlot, FishType, ItemRarity, ItemType, PartyRole, QuestDifficulty, QuestStatus, SkillType, SlotVariant, SocialLinkType, StatType, StatusEffectType, TargetType, TimePeriod, WeaponType, WeatherType } from '@org/game-engine';
+import { AchievementCategory, ArmorType, CharacterClass, ElementType, EquipmentSlot, FishType, ItemRarity, ItemType, PartyRole, QuestDifficulty, QuestObjectiveType, QuestStatus, SkillType, SlotVariant, SocialLinkType, StatType, StatusEffectType, TargetType, TimePeriod, WeaponType, WeatherType } from '@org/game-engine';
 
 export abstract class BaseEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -558,8 +558,8 @@ export class QuestObjective {
   @Column()
   objectiveId: string;
 
-  @Column({ type: 'enum', enum: QuestObjective })
-  type: QuestObjective;
+  @Column({ type: 'enum', enum: QuestObjectiveType })
+  type: QuestObjectiveType;
 
   @Column()
   description: string;
