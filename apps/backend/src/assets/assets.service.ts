@@ -1,0 +1,251 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, FindOptionsWhere } from 'typeorm';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { AssetMetadata, AssetCategory, AssetVisibility } from '@org/shared-types';
+import {
+  UploadAssetDto,
+  PresignedUploadResponse,
+  AssetMetadataResponse,
+  ListAssetsQueryDto,
+  PaginatedAssetsResponse,
+  PresignedDownloadResponse,
+} from '@org/shared-types';
+
+@Injectable()
+export class AssetsService {
+  private readonly logger = new Logger(AssetsService.name);
+  private readonly s3Client: S3Client;
+  private readonly bucketName: string;
+  private readonly baseUrl: string;
+
+  constructor(
+    @InjectRepository(AssetMetadata)
+    private readonly assetRepo: Repository<AssetMetadata>,
+    private readonly configService: ConfigService,
+  ) {
+    const endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
+    const port = this.configService.get<number>('MINIO_PORT', 9000);
+    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', 'dev_minio_admin');
+    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', 'dev_minio_password');
+    const useSSL = this.configService.get<boolean>('MINIO_USE_SSL', false);
+
+    this.bucketName = this.configService.get<string>('MINIO_BUCKET', 'carbuncle-assets');
+
+    // Build base URL for asset access
+    const protocol = useSSL ? 'https' : 'http';
+    this.baseUrl = `${protocol}://${endPoint}:${port}/${this.bucketName}`;
+
+    this.s3Client = new S3Client({
+      endpoint: `${protocol}://${endPoint}:${port}`,
+      region: 'us-east-1', // MinIO doesn't care about region
+      credentials: {
+        accessKeyId: accessKey,
+        secretAccessKey: secretKey,
+      },
+      forcePathStyle: true, // Required for MinIO
+    });
+  }
+
+  /**
+   * Generate a presigned upload URL for client-side direct upload.
+   */
+  async generatePresignedUploadUrl(dto: UploadAssetDto): Promise<PresignedUploadResponse> {
+    const assetId = crypto.randomUUID();
+    const subPath = dto.subPath ? `${dto.subPath}/` : '';
+    const extension = dto.mimeType.split('/')[1] || 'bin';
+    const assetKey = `${dto.category}/${subPath}${assetId}.${extension}`;
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: assetKey,
+      ContentType: dto.mimeType,
+    });
+
+    // Presigned URL expires in 15 minutes
+    const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: 900 });
+
+    // Save metadata to database
+    const asset = this.assetRepo.create({
+      id: assetId,
+      category: dto.category,
+      assetKey,
+      filename: dto.filename,
+      mimeType: dto.mimeType,
+      fileSize: dto.fileSize,
+      visibility: 'public',
+    });
+
+    await this.assetRepo.save(asset);
+
+    const accessUrl = `${this.baseUrl}/${assetKey}`;
+
+    return {
+      assetId,
+      uploadUrl,
+      accessUrl,
+      assetKey,
+      expiresAt: new Date(Date.now() + 900000).toISOString(),
+    };
+  }
+
+  /**
+   * Generate a presigned download URL for private assets.
+   */
+  async generatePresignedDownloadUrl(
+    assetId: string,
+    expiresIn = 3600,
+  ): Promise<PresignedDownloadResponse> {
+    const asset = await this.assetRepo.findOne({ where: { id: assetId } });
+
+    if (!asset) {
+      throw new NotFoundException(`Asset with ID ${assetId} not found`);
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: asset.assetKey,
+    });
+
+    const downloadUrl = await getSignedUrl(this.s3Client, command, { expiresIn });
+
+    return {
+      downloadUrl,
+      expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),
+    };
+  }
+
+  /**
+   * Get public asset URL directly.
+   */
+  getPublicUrl(assetKey: string): string {
+    return `${this.baseUrl}/${assetKey}`;
+  }
+
+  /**
+   * Retrieve asset metadata by ID.
+   */
+  async getAssetMetadata(assetId: string): Promise<AssetMetadataResponse> {
+    const asset = await this.assetRepo.findOne({ where: { id: assetId } });
+
+    if (!asset) {
+      throw new NotFoundException(`Asset with ID ${assetId} not found`);
+    }
+
+    const url = this.getPublicUrl(asset.assetKey);
+    const { ownerId, ...metadataWithoutOwner } = asset;
+
+    return {
+      ...metadataWithoutOwner,
+      category: metadataWithoutOwner.category as AssetCategory,
+      visibility: metadataWithoutOwner.visibility as AssetVisibility,
+      url,
+    };
+  }
+
+  /**
+   * List assets with filtering and pagination.
+   */
+  async listAssets(query: ListAssetsQueryDto): Promise<PaginatedAssetsResponse> {
+    const {
+      category,
+      subPath,
+      visibility = 'public',
+      page = 1,
+      limit = 20,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
+
+    const where: FindOptionsWhere<AssetMetadata> = {};
+
+    if (category) {
+      where.category = category;
+    }
+
+    if (visibility) {
+      where.visibility = visibility;
+    }
+
+    // Using basic TypeORM ILike if subPath is provided
+    if (subPath) {
+      const { ILike } = await import('typeorm');
+      where.assetKey = ILike(`%/${subPath}/%`);
+    }
+
+    const [assets, total] = await this.assetRepo.findAndCount({
+      where,
+      order: { [sortBy]: sortOrder } as any, // Cast to any to handle dynamic sorting keys safely
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    // Map database models to match AssetMetadataResponse interface exactly
+    const items = assets.map((asset) => {
+      const { ownerId, ...metadataWithoutOwner } = asset;
+      return {
+        ...metadataWithoutOwner,
+        category: metadataWithoutOwner.category as AssetCategory,
+        visibility: metadataWithoutOwner.visibility as AssetVisibility,
+        url: this.getPublicUrl(asset.assetKey),
+      };
+    });
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+
+  /**
+   * Delete an asset from both S3 and database.
+   */
+  async deleteAsset(assetId: string): Promise<void> {
+    const asset = await this.assetRepo.findOne({ where: { id: assetId } });
+
+    if (!asset) {
+      throw new NotFoundException(`Asset with ID ${assetId} not found`);
+    }
+
+    // Delete from S3
+    const command = new DeleteObjectCommand({
+      Bucket: this.bucketName,
+      Key: asset.assetKey,
+    });
+
+    await this.s3Client.send(command);
+
+    // Delete from database
+    await this.assetRepo.delete(assetId);
+
+    this.logger.log(`Deleted asset: ${assetId} (${asset.assetKey})`);
+  }
+
+  /**
+   * Verify asset exists in S3.
+   */
+  async verifyAssetExists(assetKey: string): Promise<boolean> {
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: assetKey,
+      });
+      await this.s3Client.send(command);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
