@@ -51,3 +51,13 @@ export const AuthOptions = {
     JWT_SECRET: environment.JWT_SECRET,
     ACCESS_TOKEN_EXPIRY: '1d',
 } as const
+
+export const DevS3Options = {
+    ENDPOINT: 'localhost',
+    PORT: 9000,
+    ACCESS_KEY: 'dev_minio_admin',
+    SECRET_KEY: 'dev_minio_password',
+    SSL: false,
+    BUCKET_NAME: 'carbuncle-assets'
+} as const
+

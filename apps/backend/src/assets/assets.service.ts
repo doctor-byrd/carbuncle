@@ -19,6 +19,8 @@ import {
   PaginatedAssetsResponse,
   PresignedDownloadResponse,
 } from '@org/shared-types';
+import { DevS3Options } from '../common/general';
+import { environment } from '../common/environment';
 
 @Injectable()
 export class AssetsService {
@@ -32,13 +34,12 @@ export class AssetsService {
     private readonly assetRepo: Repository<AssetMetadata>,
     private readonly configService: ConfigService,
   ) {
-    const endPoint = this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
-    const port = this.configService.get<number>('MINIO_PORT', 9000);
-    const accessKey = this.configService.get<string>('MINIO_ACCESS_KEY', 'dev_minio_admin');
-    const secretKey = this.configService.get<string>('MINIO_SECRET_KEY', 'dev_minio_password');
-    const useSSL = this.configService.get<boolean>('MINIO_USE_SSL', false);
-
-    this.bucketName = this.configService.get<string>('MINIO_BUCKET', 'carbuncle-assets');
+    const endPoint = environment.ENVIRONMENT === 'development' ? DevS3Options.ENDPOINT : this.configService.get<string>('MINIO_ENDPOINT', 'localhost');
+    const port = environment.ENVIRONMENT === 'development' ? DevS3Options.PORT : this.configService.get<number>('MINIO_PORT', 9000);
+    const accessKey = environment.ENVIRONMENT === 'development' ? DevS3Options.ACCESS_KEY : this.configService.get<string>('MINIO_ACCESS_KEY', 'dev_minio_admin');
+    const secretKey = environment.ENVIRONMENT === 'development' ? DevS3Options.SECRET_KEY : this.configService.get<string>('MINIO_SECRET_KEY', 'dev_minio_password');
+    const useSSL = environment.ENVIRONMENT === 'development' ? DevS3Options.SSL : this.configService.get<boolean>('MINIO_USE_SSL', false);
+    this.bucketName = environment.ENVIRONMENT === 'development' ? DevS3Options.BUCKET_NAME : this.configService.get<string>('MINIO_BUCKET', 'carbuncle-assets');
 
     // Build base URL for asset access
     const protocol = useSSL ? 'https' : 'http';
